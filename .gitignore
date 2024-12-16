@@ -1,0 +1,17 @@
+node_modules
+temp
+build
+dist
+/tags
+.DS_Store
+
+# VS Code
+.vscode/*
+.history/
+*.vsix
+
+# IDEA files
+.idea
+
+# VIM
+Session.vim
