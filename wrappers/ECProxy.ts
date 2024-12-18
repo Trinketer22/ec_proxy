@@ -62,7 +62,7 @@ export class ECProxy implements Contract {
 
     static withdrawExtraECMessage(withdrawSpecific: boolean, to: Address, curId: number, fromBalance: bigint = 0n, queryId: bigint | number = 0) {
         const head =  beginCell()
-                        .storeUint(345, 32)
+                        .storeUint(Ops.wallet.withdraw_extra, 32)
                         .storeUint(queryId, 64)
                         .storeBit(withdrawSpecific);
         if(withdrawSpecific) {
@@ -85,7 +85,7 @@ export class ECProxy implements Contract {
     }
 
     static updateForwardGasMessage(forwardGas: bigint, queryId: bigint | number = 0) {
-        return beginCell().storeUint(123, 32)
+        return beginCell().storeUint(Ops.wallet.update_forward_gas, 32)
                           .storeUint(queryId, 64)
                           .storeCoins(forwardGas)
                .endCell();

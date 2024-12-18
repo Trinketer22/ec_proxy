@@ -1,21 +1,21 @@
 export const Ops = {
     minter: {
-       deploy_wallet: 0x4f5f4313,
+       deploy_wallet: 0x44bb3e46,
        provide_wallet_address: 0x2c76b973,
        take_wallet_address: 0xd1735400,
-       drop_admin: 0x7431f221,
-       change_content: 0xcb862902
+       drop_admin: 0x67a18fb6,
+       change_content: 0x5ecabd5c
     },
 
     wallet: {
-       internal_deploy: 0x6540cf85,
-       transfer_notification: 0x7362d09c,
-       transfer: 0x0f8a7ea5,
-       ec_transfer : 0x1f3835d,
-       excesses: 0xd53276db,
-       ton_refund: 0xae25d79e,
-       update_forward_gas: 123,
-       withdraw_extra: 345
+       internal_deploy : 0x6a4de08d,
+       excesses : 0xd53276db,
+       transfer_notification : 0x7362d09c,
+       ton_refund : 0xe41f7d83,
+       ec_transfer : 0x68039ead,
+       transfer : 0x0f8a7ea5,
+       update_forward_gas : 0xf6f24f33,
+       withdraw_extra : 0x7ad2441e
     }
 }
 export const ECErrors = {
