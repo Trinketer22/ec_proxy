@@ -1,0 +1,68 @@
+nothing$0 {X:Type} = Maybe X;
+just$1 {X:Type} value:X = Maybe X;
+left$0 {X:Type} {Y:Type} value:X = Either X Y;
+right$1 {X:Type} {Y:Type} value:Y = Either X Y;
+var_uint$_ {n:#} len:(#< n) value:(uint (len * 8))
+         = VarUInteger n;
+
+addr_none$00 = MsgAddressExt;
+addr_extern$01 len:(## 9) external_address:(bits len)
+             = MsgAddressExt;
+anycast_info$_ depth:(#<= 30) { depth >= 1 }
+   rewrite_pfx:(bits depth) = Anycast;
+addr_std$10 anycast:(Maybe Anycast)
+   workchain_id:int8 address:bits256  = MsgAddressInt;
+addr_var$11 anycast:(Maybe Anycast) addr_len:(## 9)
+   workchain_id:int32 address:(bits addr_len) = MsgAddressInt;
+_ _:MsgAddressInt = MsgAddress;
+_ _:MsgAddressExt = MsgAddress;
+nanograms$_ amount:(VarUInteger 16) = Grams;
+
+_ grams:Grams = Coins;
+
+// Requests
+
+internal_deploy#6a4de08d
+refundAddress:MsgAddress
+forwardGas:Coins
+= InternalMsgBody;
+// crc32('internal_deploy refundAddress:MsgAddress forwardGas:Coins = InternalMsgBody') = 0x6a4de08d & 0x7FFFFFFF = 0x6a4de08d;
+
+// Compatible with jetton https://github.com/ton-blockchain/TEPs/blob/master/text/0074-jettons-standard.md#tl-b-schema
+transfer#0xf8a7ea5 query_id:uint64 amount:(VarUInteger 16) destination:MsgAddress
+response_destination:MsgAddress custom_payload:(Maybe ^Cell)
+forward_ton_amount:(VarUInteger 16) forward_payload:(Either Cell ^Cell) = InternalMsgBody;
+
+// Compatible with jetton https://github.com/ton-blockchain/TEPs/blob/master/text/0074-jettons-standard.md#tl-b-schema
+transfer_notification#7362d09c query_id:uint64 amount:(VarUInteger 16) 
+sender:MsgAddress forward_payload:(Either Cell ^Cell) = InternalMsgBody; 
+
+
+// Full format incoming ec transfer
+ec_transfer#68039ead forward_gas:Coins
+refund:MsgAddress
+forward_payload:(Either Cell ^Cell)
+= InternalMsgBody;
+// crc32('ec_transfer forward_gas:Coins refund:MsgAddress forward_payload:Either Cell ^Cell = InternalMsgBody') = 0x68039ead & 0x7FFFFFFF = 0x68039ead
+
+withdraw_id:uint32 = WithdrawSpecific;
+
+withdraw_extra#7ad2441e query_id:uint64
+specific:(Maybe WithdrawSpecific)
+from_balance_amount:Coins
+to:MsgAddress = InternalMsgBody;
+// crc32('withdraw_extra query_id:uint64 specific:Maybe WithdrawSpecific from_balance_amount:Coins to:MsgAddress = InternalMsgBody') = 0xfad2441e & 0x7FFFFFFF = 0x7ad2441e
+
+update_forward_gas#f6f24f33 query_id:uint64
+forward_gas:Coins = InternalMsgBody;
+// crc32('update_forward_gas query_id:uint64 forward_gas:Coins = InternalMsgBody') = 0x76f24f33 & 0x7FFFFFFF = 0xf6f24f33
+
+
+// Responses
+
+
+// Compatible with jetton https://github.com/ton-blockchain/TEPs/blob/master/text/0074-jettons-standard.md#tl-b-schema
+excesses#d53276db query_id:uint64 = InternalMsgBody;
+
+ton_refund#e41f7d83 query_id:uint64 error:uint10 = InternalMsgBody;
+//crc32('ton_refund query_id:uint64 error:uint10 = InternalMsgBody') = 0xe41f7d83 | 0x80000000 = 0xe41f7d83
