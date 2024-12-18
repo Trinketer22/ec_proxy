@@ -6,11 +6,10 @@ import "../helpers/errors.tolk"
 import "../helpers/messages.tolk"
 import "../helpers/ec_helpers.tolk"
 import "../helpers/jetton-utils.tolk"
-import "op-codes.tolk";
-import "messages.tolk";
+import "messages.tolk"
 
-import "@stdlib/gas-payments";
-import "@stdlib/tvm-dicts";
+import "@stdlib/gas-payments"
+import "@stdlib/tvm-dicts"
 
 
 

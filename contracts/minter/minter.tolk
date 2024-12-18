@@ -41,7 +41,7 @@ fun onInternalMessage(myBalance: int, msgValue: int, msgFull: cell, msgBody: sli
             curId,
             owner,
             getMyAddress(),
-      walletCode	
+            walletCode
     );
 
     var newWalletAddress = calculateJettonWalletAddress(newWalletState);

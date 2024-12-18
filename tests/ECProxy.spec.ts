@@ -761,7 +761,7 @@ describe('EC Proxy', () => {
         // console.log(gasFee + expFwdFee);
         // console.log("Expect to fail");
         res = await deployer.sendMessages([internalEcRelaxed({
-            value: {coins: gasFee + msgPrices.lumpPrice - 2n, ec: [[123, txAmount]]},
+            value: {coins: gasFee + msgPrices.lumpPrice - 1n, ec: [[123, txAmount]]},
             to: deployerProxy.address,
             body: testBody
         })]);
