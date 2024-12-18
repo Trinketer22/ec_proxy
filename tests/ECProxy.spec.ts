@@ -655,7 +655,7 @@ describe('EC Proxy', () => {
         // Picked in such a way grams storage bits are static and fwd fee doesn't change
         let txAmount    = BigInt(getRandomInt(512, 1023));
         let fwdAmount   = BigInt(getRandomInt(1, 5)) * toNano('0.1');
-        let minAmount   = toNano('0.0109652');
+        let minAmount   = toNano('0.010930');
         let testPayload = beginCell().storeUint(getRandomInt(1000, 10000), 32).endCell();
 
         let res = await deployerProxy.sendTransfer(deployer.getSender(),
@@ -778,7 +778,7 @@ describe('EC Proxy', () => {
             op: Ops.wallet.ton_refund,
             body: (b) => {
                 const ds = b!.beginParse().skip(32 + 64);
-                return ds.loadBit() && ds.loadUint(10) == ECErrors.not_enough_gas;
+                return ds.loadUint(10) == ECErrors.not_enough_gas;
             }
         });
     });
@@ -858,7 +858,7 @@ describe('EC Proxy', () => {
             op: Ops.wallet.ton_refund,
             body: (b) => {
                 const ds = b!.beginParse().skip(32 + 64);
-                return ds.loadBit() && ds.loadUint(10) == ECErrors.not_enough_gas;
+                return ds.loadUint(10) == ECErrors.not_enough_gas;
             }
         });
 

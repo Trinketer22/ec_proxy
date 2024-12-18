@@ -75,12 +75,9 @@ fun sendExcess(reserve: int, reserveMode: int, ec: cell, op: int, queryId: int, 
   				.storePrefixOnlyBody()
   				.storeUint(op, 32)
   				.storeUint(queryId, 64);
-
   if(err) {
     // Err codes up to 1023
-    msg.storeUint(1, 1).storeUint(err, 10);
-  } else {
-    msg.storeUint(0, 1);
+    msg.storeUint(err, 10);
   }
   sendRawMessage(msg.endCell(), SEND_MODE_CARRY_ALL_BALANCE | SEND_MODE_IGNORE_ERRORS);
 }
