@@ -45,7 +45,7 @@ forward_payload:(Either Cell ^Cell)
 = InternalMsgBody;
 // crc32('ec_transfer forward_gas:Coins refund:MsgAddress forward_payload:Either Cell ^Cell = InternalMsgBody') = 0x68039ead & 0x7FFFFFFF = 0x68039ead
 
-withdraw_id:uint32 = WithdrawSpecific;
+_withdraw_id:uint32 = WithdrawSpecific;
 
 withdraw_extra#7ad2441e query_id:uint64
 specific:(Maybe WithdrawSpecific)
