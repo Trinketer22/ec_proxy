@@ -670,7 +670,7 @@ describe('EC Proxy', () => {
         // Picked in such a way grams storage bits are static and fwd fee doesn't change
         let txAmount    = BigInt(getRandomInt(512, 1023));
         let fwdAmount   = BigInt(getRandomInt(1, 5)) * toNano('0.1');
-        let minAmount   = toNano('0.010930');
+        let minAmount   = toNano('0.0109316');
         let testPayload = beginCell().storeUint(getRandomInt(1000, 10000), 32).endCell();
 
         let res = await deployerProxy.sendTransfer(deployer.getSender(),
