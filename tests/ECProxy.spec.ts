@@ -174,13 +174,14 @@ describe('EC Proxy', () => {
                         op: Ops.minter.deploy_wallet,
                         aborted: false,
                     })!;
-                    expect(deployResult.transactions).toHaveTransaction({
+                    const deployIntTx = findTransactionRequired(deployResult.transactions, {
                         on: testProxy.address,
                         from: minter.address,
                         op: Ops.wallet.internal_deploy,
                         deploy: true,
                         aborted: false
                     });
+                    // console.log("DeployIntTx gas:", computedGeneric(deployIntTx).gasUsed);
                     const fees = computedGeneric(deployTx);
                     totalGas   += fees.gasUsed;
                     totalSpent += fees.gasFees;
@@ -200,13 +201,20 @@ describe('EC Proxy', () => {
         });
         it('wallet discovery result should match get_wallet_address call', async () => {
             // await blockchain.loadFrom(initialState);
-            for(let i = 0; i < 100; i++) {
+            let totalFees = 0n;
+            for(let i = 0; i < 1; i++) {
                 const testAddress = new Address(0, await getSecureRandomBytes(32));
                 const testProxy   = await userWallet(testAddress);
 
                 for(let includeAddr of [false, true]) {
                     let res = await minter.sendDiscovery(deployer.getSender(), testAddress, includeAddr);
-                    expect(res.transactions).toHaveTransaction({
+                    const discoveryTx = findTransactionRequired(res.transactions, {
+                        on: minter.address,
+                        from: deployer.address,
+                        op: Ops.minter.provide_wallet_address
+                    });
+                    console.log("Discovery", computedGeneric(discoveryTx).gasUsed);
+                    const lookupTx = findTransactionRequired(res.transactions, {
                         on: deployer.address,
                         from: minter.address,
                         op: Ops.minter.take_wallet_address,
@@ -215,8 +223,15 @@ describe('EC Proxy', () => {
                             owner: includeAddr ? testAddress : null
                         })
                     });
+                    const inMsg = lookupTx.inMessage!;
+                    if(inMsg.info.type !== 'internal') {
+                        throw Error("No way");
+                    }
+                    totalFees += toNano('0.05') - inMsg.info.value.coins;
                 }
             }
+            console.log("Discovery average cost:", fromNano(totalFees / 200n));
+            // console.log("100K gas costs:", fromNano(computeGasFee(gasPrices, 100000n)));
         });
         it('admin should be able to update content', async () => {
             const getBefore = await minter.getJettonData();

@@ -5,6 +5,8 @@ import "../helpers/jetton-utils.tolk"
 import "op-codes.tolk"
 import "storage.tolk"
 import "@stdlib/tvm-dicts"
+import "@stdlib/gas-payments"
+import "gas.tolk";
 
 fun onInternalMessage(myBalance: int, msgValue: int, msgFull: cell, msgBody: slice) {
 	var cs    = msgFull.beginParse();
@@ -17,13 +19,20 @@ fun onInternalMessage(myBalance: int, msgValue: int, msgFull: cell, msgBody: sli
   var senderAddress = cs.loadAddress();
 	var op: int = msgBody.loadUint(32);
 	var queryId: int = msgBody.loadUint(64);
+	var (ec: cell, fwdFee: int)  = cs.extractEcAndForwardFee();
+  fwdFee = calculateOriginalMessageFee(MY_WORKCHAIN, fwdFee);
 
 
 	loadData();
 
   if(op == deploy_wallet) {
 
-    reserveToncoinsOnBalance(ONE_TON / 10, RESERVE_REGULAR); // reserve for storage fees
+    var storage_reserve = ONE_TON / 10;
+
+    // Rough fwd_fee.estimate here
+    var gasRequired = calculateGasFee(MY_WORKCHAIN, DEPLOY_GAS + DEPLOY_INTERNAL_GAS + ITERATION_ESTIMATE * ITERATION_NUM) + fwdFee * 3;
+    assert(msgValue >= gasRequired, not_enough_gas);
+    reserveToncoinsOnBalance(storage_reserve, RESERVE_REGULAR); // reserve for storage fees
     /*
     deploy_wallet#4f5f4313
     query_id:uint64
@@ -64,6 +73,9 @@ fun onInternalMessage(myBalance: int, msgValue: int, msgFull: cell, msgBody: sli
   }
   if (op == provide_wallet_address) {
       // see provide_wallet_address TL-B layout in jetton.tlb
+      var gasRequired = calculateGasFee(MY_WORKCHAIN, DISCOVERY_INCLUDED_GAS + ITERATION_ESTIMATE * ITERATION_NUM) + mulDivFloor(fwdFee, 3, 2);
+      // debugPrint(gasRequired);
+      assert(msgValue >= gasRequired, not_enough_gas);
       var ownerAddress: slice = msgBody.loadAddress();
       var isIncludeAddress: int = msgBody.loadBool();
       msgBody.assertEndOfSlice();
