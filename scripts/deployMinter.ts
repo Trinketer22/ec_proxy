@@ -14,9 +14,10 @@ export async function run(provider: NetworkProvider) {
     const content = jettonContentToCell({
         type: 'onchain',
         data: {
-            uri:'http://localhost/meta.json',
+            name: "TestEC",
+            symbol: 'TEC',
             decimals: '9',
-            description: 'My test jetton'
+            description: 'Test extra currency'
         }
     });
     const minter = provider.open(Minter.createFromConfig({
