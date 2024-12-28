@@ -25,16 +25,28 @@ export type MinterConfig = {
 export function OnChainString(): DictionaryValue<string> {
     return {
         serialize(src, builder) {
-            builder.storeStringTail(src);
+            builder.storeRef(beginCell().storeUint(0, 8).storeStringTail(src));
         },
         parse(src) {
-            return src.loadStringTail();
+            const sc  = src.loadRef().beginParse();
+            const tag = sc.loadUint(8);
+            if(tag == 0) {
+                return sc.loadStringTail();
+            } else if(tag == 1) {
+                // Not really tested, but feels like it should work
+                const chunkDict = Dictionary.loadDirect(Dictionary.Keys.Uint(32), Dictionary.Values.Cell(), sc);
+                return chunkDict.values().map(x => x.beginParse().loadStringTail()).join('');
+
+            } else {
+                throw Error(`Prefix ${tag} is not supported yet!`);
+            }
         }
     }
 }
 export function jettonContentToCell(content: JettonMinterContent) {
     if(content.type == 'offchain') {
         return beginCell()
+            .storeUint(1, 8)
             .storeStringRefTail(content.uri) //Snake logic under the hood
             .endCell();
     }
