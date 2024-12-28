@@ -172,7 +172,7 @@ export class Minter implements Contract {
         }
     }
     async getJettonDataExtended(provider: ContractProvider) {
-        const { stack } = await provider.get('get_jetton_data', []);
+        const { stack } = await provider.get('get_jetton_data_extra', []);
         return {
             currencyId: stack.readNumber(),
             supply: stack.readBigNumber(),
