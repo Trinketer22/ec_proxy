@@ -144,7 +144,8 @@ fun onInternalMessage(myTonBalance: int, msgValue: int, msgFull: cell, msgBody: 
 		msgBody.assertEndOfSlice();
 
 		if(fromBalance > 0) {
-			assert(myTonBalance - msgValue - fromBalance >= getMinStorage(), not_enough_balance);
+			fromBalance = min(fromBalance, myTonBalance - msgValue - getMinStorage());
+			assert(fromBalance > 0, not_enough_balance);
 		}
 
 		var (wc, hash, isStd) = isStandardAddress(to);
