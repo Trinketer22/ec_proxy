@@ -27,5 +27,6 @@ export const ECErrors = {
    not_inited      : 301,
    not_enough_gas  : 400,
    not_enough_ec_balance : 401,
+   not_enough_balance: 402,
    invalid_sender  : 500
 }
