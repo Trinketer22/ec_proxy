@@ -58,7 +58,7 @@ export const promptAmount = async (prompt: string, decimals: number, provider: U
         try {
             resAmount = toUnits(inputAmount, decimals);
 
-            if (resAmount <= 0) {
+            if (resAmount < 0) {
                 throw new Error("Please enter positive number");
             }
 
