@@ -137,8 +137,6 @@ fun onInternalMessage(myTonBalance: int, msgValue: int, msgFull: cell, msgBody: 
 			reserveEc = getRawEc();
 			// Removing current EC from reserve dictionary
 			reserveEc.uDictDelete(32, curId);
-			// Throw if there is no EC other than current one
-			assert(!dictIsEmpty(reserveEc), not_enough_ec_balance);
 		}
 
 		var fromBalance = msgBody.loadCoins();
