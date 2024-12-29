@@ -3,12 +3,12 @@ import { compile, NetworkProvider, UIProvider} from '@ton/blueprint';
 import { jettonContentToCell, Minter } from '../wrappers/Minter';
 import { promptBool, promptAmount, promptAddress, displayContentCell, getLastBlock, waitForTransaction, getAccountLastTx, promptToncoin, promptUrl, jettonWalletCodeFromLibrary, promptBigInt } from '../wrappers/ui-utils';
 import {TonClient4} from "@ton/ton";
-import { fromUnits } from '../wrappers/units';
-import { ECProxy } from '../wrappers/ECProxy';
+import { fromUnits, toUnits } from '../wrappers/units';
+import { ECProxy, WithdrawOptions } from '../wrappers/ECProxy';
 let minterContract:OpenedContract<Minter>;
 
 const adminActions  = ['Drop admin',  'Change metadata' ];
-const userActions   = ['Info', 'Deploy wallet', 'Top up', 'Quit'];
+const userActions   = ['Info', 'Deploy wallet', 'Send EC', 'Withdraw excess', 'Top up', 'Quit'];
 let minterCode: Cell;
 let walletCode: Cell;
 let adminAddress: Address | null;
@@ -54,12 +54,21 @@ const deployWalletAction   = async (provider: NetworkProvider, ui: UIProvider) =
 
     await minterContract.sendDeployWallet(sender, deployFor, refund);
 }
-const sendToProxyAction    = async (provider: NetworkProvider, ui: UIProvider) => {
+const sendAction    = async (provider: NetworkProvider, ui: UIProvider) => {
 
-    const sender    = provider.sender();
-    const to = await promptAddress("Please specify destination (proxy owner) address:", ui);
-    const destProxy  = await minterContract.getWalletAddress(to);
-    const sendAmount = await promptAmount("Please specify EC amount:", decimals, ui);
+    let to = await promptAddress("Please specify destination address:", ui);
+    let tonAmount = toNano('0.05');
+    const sender  = provider.sender();
+    const toProxy = await promptBool("Resolve destination ec proxy address?", ['yes', 'no'], ui, true);
+    if(toProxy) {
+        to = await minterContract.getWalletAddress(to);
+    }
+
+    const sendAmount = await promptAmount("Please specify EC amount to send:", decimals, ui);
+
+    const forwardTon = await promptToncoin("Please specify attached ton value(could be 0):", ui);
+    tonAmount += forwardTon;
+
 
     if(!senderAddr) {
         senderAddr = sender.address ?? await promptAddress("Please specify sender address:", ui);
@@ -71,13 +80,24 @@ const sendToProxyAction    = async (provider: NetworkProvider, ui: UIProvider) =
         await minterContract.getWalletAddress(senderAddr)
     ));
 
+    ui.write(JSON.stringify({
+        to: to.toString(),
+        ec: fromUnits(sendAmount, decimals),
+        total_ton: fromNano(tonAmount),
+        forward_ton: fromNano(forwardTon),
+    }, null, 2));
+    const isOk = await promptBool("Is it ok?", ['yes', 'no'], ui);
 
-    await senderProxy.sendTransfer(sender,
-                                   toNano('0.05'),
-                                   sendAmount,
-                                   destProxy,
-                                   refundAddress,
-                                   null, 0n, null);
+    if(isOk) {
+        await senderProxy.sendTransfer(sender,
+                                       tonAmount,
+                                       sendAmount,
+                                       to,
+                                       refundAddress,
+                                       null, forwardTon, null);
+    } else {
+        ui.write("Sending aborted!");
+    }
 }
 
 const updateMetadataAction = async (provider: NetworkProvider, ui: UIProvider) => {
@@ -195,8 +215,8 @@ export async function run(provider: NetworkProvider) {
             case 'Deploy wallet':
                 await deployWalletAction(provider, ui);
                 break;
-            case 'Send to proxy':
-                await sendToProxyAction(provider, ui);
+            case 'Send EC':
+                await sendAction(provider, ui);
                 break;
             case 'Change metadata':
                 await updateMetadataAction(provider, ui);
