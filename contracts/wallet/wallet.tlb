@@ -29,7 +29,7 @@ forwardGas:Coins
 // crc32('internal_deploy refundAddress:MsgAddress forwardGas:Coins = InternalMsgBody') = 0x6a4de08d & 0x7FFFFFFF = 0x6a4de08d;
 
 // Compatible with jetton https://github.com/ton-blockchain/TEPs/blob/master/text/0074-jettons-standard.md#tl-b-schema
-transfer#0xf8a7ea5 query_id:uint64 amount:(VarUInteger 16) destination:MsgAddress
+transfer#f8a7ea5 query_id:uint64 amount:(VarUInteger 16) destination:MsgAddress
 response_destination:MsgAddress custom_payload:(Maybe ^Cell)
 forward_ton_amount:(VarUInteger 16) forward_payload:(Either Cell ^Cell) = InternalMsgBody;
 
@@ -45,7 +45,7 @@ forward_payload:(Either Cell ^Cell)
 = InternalMsgBody;
 // crc32('ec_transfer forward_gas:Coins refund:MsgAddress forward_payload:Either Cell ^Cell = InternalMsgBody') = 0x68039ead & 0x7FFFFFFF = 0x68039ead
 
-_withdraw_id:uint32 = WithdrawSpecific;
+_ withdraw_id:uint32 = WithdrawSpecific;
 
 withdraw_extra#7ad2441e query_id:uint64
 specific:(Maybe WithdrawSpecific)
