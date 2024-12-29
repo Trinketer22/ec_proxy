@@ -121,7 +121,42 @@ const updateMetadataAction = async (provider: NetworkProvider, ui: UIProvider) =
 }
 
 const withdrawExtraAction = async (provider: NetworkProvider, ui: UIProvider) => {
-    // TODO
+    let withdrawOpts: WithdrawOptions;
+    const sender = provider.sender();
+    const withdrawSpecific = !(await promptBool("Withdraw all excess EC?", ['yes', 'no'], ui, true));
+    if(!senderAddr) {
+        senderAddr = sender.address ??  await promptAddress("Please specify proxy owner address:", ui);
+    }
+
+    const to = await promptAddress("Please specify destination address", ui, senderAddr);
+    const fromBalance = await promptToncoin("Please specify amount to withdraw from balance:", ui);
+
+    const senderProxy = provider.open(ECProxy.createFromAddress(
+        await minterContract.getWalletAddress(senderAddr)
+    ));
+
+    if(withdrawSpecific) {
+        const curId = Number(await promptBigInt("Provide currency id to withdraw:", ui));
+        withdrawOpts = {
+            withdrawSpecific,
+            fromBalance,
+            curId
+        }
+        ui.write(`Withdrawing all EC with id ${curId} and ${fromNano(fromBalance)} TON to ${to}`);
+    } else {
+        withdrawOpts = {
+            withdrawSpecific: false,
+            fromBalance
+        }
+        ui.write(`Withdrawing all EC and ${fromNano(fromBalance)} TON to ${to}`);
+    }
+
+    const isOk = await promptBool("Is it ok?", ['yes', 'no'], ui);
+    if(isOk) {
+        await senderProxy.sendWithdrawExtraEC(sender, to, withdrawOpts);
+    } else {
+        ui.write("Sending aborted!");
+    }
 }
 
 const dropAdminAction = async (provider: NetworkProvider, ui: UIProvider) => {
@@ -226,6 +261,9 @@ export async function run(provider: NetworkProvider) {
                 break;
             case 'Info':
                 await infoAction(provider, ui);
+                break;
+            case 'Withdraw excess':
+                await withdrawExtraAction(provider, ui);
                 break;
             case 'Top up':
                 await topUpAction(provider, ui);

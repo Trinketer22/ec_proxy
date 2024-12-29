@@ -10,6 +10,7 @@ import { findTransaction, findTransactionRequired } from '@ton/test-utils';
 import { receiveMessageOnPort } from 'node:worker_threads';
 import { getSecureRandomBytes, sha256 } from '@ton/crypto';
 import { collectCellStats, computeFwdFees, computeGasFee, getGasPrices, getMsgPrices } from './gasUtils';
+import { WithdrawOptions } from '../wrappers/ECProxy';
 
 describe('EC Proxy', () => {
     let minterCode: Cell;
@@ -32,6 +33,8 @@ describe('EC Proxy', () => {
     let userWallet: (user: Address) => Promise<SandboxContract<ECProxyTest>>;
     let getContractEc: (contract: Address) => Promise<Dictionary<number, bigint> | null>;
     let getContractEcBalance: (contract: Address, id: number) => Promise<bigint>;
+
+    let withExcessCurrency: BlockchainSnapshot;
 
     beforeAll(async () => {
         minterCode = await compile('Minter');
@@ -893,5 +896,188 @@ describe('EC Proxy', () => {
                 payload: testBody
             })
         });
+    });
+    it('wallet owner should be able to withdraw excess tons and EC', async () => {
+        const beforeTest = await blockchain.snapshot();
+        const amount456  = BigInt(getRandomInt(11, 20));
+        const amount789  = BigInt(getRandomInt(21, 30));
+        // Will accept empty body message
+        await deployer.sendMessages([internalEcRelaxed({
+            to: deployerProxy.address,
+            value: {coins: toNano('10'), ec: [
+                // Non-legitimate
+                [456, amount456],
+                [789, amount789],
+            ]},
+        })]);
+        const proxyEc = (await getContractEc(deployerProxy.address))!;
+        expect(proxyEc.get(456)).toEqual(amount456);
+        expect(proxyEc.get(789)).toEqual(amount789);
+
+        withExcessCurrency = blockchain.snapshot();
+
+        const res = await deployerProxy.sendWithdrawExtraEC(deployer.getSender(), deployer.address, {withdrawSpecific: false, fromBalance: toNano('10')});
+
+        const excessTx = findTransactionRequired(res.transactions, {
+            on: deployer.address,
+            from: deployerProxy.address,
+            op: Ops.wallet.excesses,
+        });
+
+        const inMsg = excessTx.inMessage!;
+        if(inMsg.info.type !== 'internal') {
+            throw Error("No way");
+        }
+
+        const excessValue = inMsg.info.value;
+        // Will exceed due to message value
+        expect(excessValue.coins).toBeGreaterThanOrEqual(toNano('10'));
+
+        const excessEc = excessValue.other!;
+        expect(excessEc).not.toBeUndefined();
+        expect(excessEc.get(456)).toEqual(amount456);
+        expect(excessEc.get(789)).toEqual(amount789);
+
+        const smc = await blockchain.getContract(deployerProxy.address);
+        // Should leave min storage
+        expect(smc.balance).toEqual(toNano('0.01'));
+
+        await blockchain.loadFrom(beforeTest);
+    });
+    it('owner should be able to withdraw specific EC', async () => {
+        const beforeTest = blockchain.snapshot();
+
+        await blockchain.loadFrom(withExcessCurrency);
+
+        const amount456 = await getContractEcBalance(deployerProxy.address, 456);
+        const amount789 = await getContractEcBalance(deployerProxy.address, 789);
+
+        expect(amount456).toBeGreaterThan(0n);
+        expect(amount789).toBeGreaterThan(0n);
+
+        let amountMap: { [k: number] : bigint } = {
+            456: amount456,
+            789: amount789
+        };
+        for(let wId of [456, 789]) {
+            const res = await deployerProxy.sendWithdrawExtraEC(deployer.getSender(), deployer.address, {withdrawSpecific: true, curId: wId, fromBalance: toNano('1')});
+
+            const excessTx = findTransactionRequired(res.transactions, {
+                on: deployer.address,
+                from: deployerProxy.address,
+                op: Ops.wallet.excesses,
+            });
+
+            const inMsg = excessTx.inMessage!;
+            if(inMsg.info.type !== 'internal') {
+                throw Error("No way");
+            }
+
+            const excessValue = inMsg.info.value;
+            expect(excessValue.coins).toBeGreaterThanOrEqual(toNano('1'));
+
+            const excessEc = excessValue.other!;
+            expect(excessEc).not.toBeUndefined();
+            // Expect EC dict with only key and equal expected amount
+            expect(excessEc.keys().length).toBe(1);
+            expect(excessEc.get(wId)).toEqual(amountMap[wId]);
+        }
+
+        await blockchain.loadFrom(beforeTest);
+    });
+    it('owner should be able to withdraw from balance separately from EC', async () => {
+        const beforeTest = blockchain.snapshot();
+
+        await blockchain.loadFrom(withExcessCurrency);
+
+        const amount456 = await getContractEcBalance(deployerProxy.address, 456);
+        const amount789 = await getContractEcBalance(deployerProxy.address, 789);
+
+        expect(amount456).toBeGreaterThan(0n);
+        expect(amount789).toBeGreaterThan(0n);
+
+        // Withdraw all excess EC but leave the balance
+        let res = await deployerProxy.sendWithdrawExtraEC(deployer.getSender(), deployer.address, {withdrawSpecific: false, fromBalance: 0n});
+
+        // All excess EC should be withdrawn
+        let proxyEc = (await getContractEc(deployerProxy.address))!;
+        expect(proxyEc).not.toBeUndefined();
+        expect(proxyEc.get(456)).toBeUndefined();
+        expect(proxyEc.get(789)).toBeUndefined();
+
+        // But main one should stay
+        const balanceBefore = proxyEc.get(123);
+        expect(balanceBefore).toBeGreaterThan(0n);
+
+        const toWithdraw = toNano('10');
+        const smc = await blockchain.getContract(deployerProxy.address);
+        expect(smc.balance).toBeGreaterThan(toWithdraw);
+
+        // Now we want to withdraw some ton
+        res = await deployerProxy.sendWithdrawExtraEC(deployer.getSender(), deployer.address, {withdrawSpecific: false, fromBalance: toWithdraw});
+
+        expect(res.transactions).toHaveTransaction({
+            on: deployer.address,
+            from: deployerProxy.address,
+            value: (v) => v! >= toWithdraw
+        });
+
+        // Original EC balance should not change
+        expect(await getContractEcBalance(deployerProxy.address, 123)).toEqual(balanceBefore);
+        expect(smc.balance).toBeGreaterThanOrEqual(toNano('0.01'));
+
+        // Should not allow to withdraw below the min storage
+        res = await deployerProxy.sendWithdrawExtraEC(deployer.getSender(), deployer.address, {withdrawSpecific: false, fromBalance: toWithdraw});
+
+        expect(res.transactions).toHaveTransaction({
+            on: deployerProxy.address,
+            from: deployer.address,
+            op: Ops.wallet.withdraw_extra,
+            aborted: true,
+            exitCode: ECErrors.not_enough_balance
+        });
+        expect(res.transactions).not.toHaveTransaction({
+            on: deployer.address,
+            from: deployerProxy.address,
+            op: Ops.wallet.excesses
+        });
+
+        await blockchain.loadFrom(beforeTest);
+    });
+    it('not owner should not be able to withdraw excess', async () => {
+        const beforeTest = blockchain.snapshot();
+
+        await blockchain.loadFrom(withExcessCurrency);
+
+        const amount456 = await getContractEcBalance(deployerProxy.address, 456);
+        const amount789 = await getContractEcBalance(deployerProxy.address, 789);
+
+        expect(amount456).toBeGreaterThan(0n);
+        expect(amount789).toBeGreaterThan(0n);
+
+        const testCases: WithdrawOptions[] = [
+            {withdrawSpecific: false},
+            {withdrawSpecific: true, curId: 456},
+            {withdrawSpecific: true, curId: 789}
+        ];
+
+        for(let testOpts of testCases) {
+            const res = await deployerProxy.sendWithdrawExtraEC(receiver.getSender(),
+                                                                deployer.address,
+                                                                testOpts);
+            expect(res.transactions).toHaveTransaction({
+                on: deployerProxy.address,
+                from: receiver.address,
+                aborted: true,
+                exitCode: ECErrors.invalid_sender
+            });
+            expect(res.transactions).not.toHaveTransaction({
+                on: deployer.address,
+                from: deployerProxy.address,
+                op: Ops.wallet.excesses
+            });
+        }
+
+        await blockchain.loadFrom(beforeTest);
     });
 })

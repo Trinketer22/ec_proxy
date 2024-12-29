@@ -9,7 +9,7 @@ type OptionsWithdrawSpecific = {
 type OptionsWithdrawAll = {
     withdrawSpecific: false
 }
-type WithdrawOptions = {
+export type WithdrawOptions = {
     queryId?: bigint,
     value?: bigint
     fromBalance?: bigint
