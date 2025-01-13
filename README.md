@@ -246,7 +246,7 @@ while 32 iterations give result int 86% of a time at a quarter of a cost.
 
 #### Changing content
 
-Admin is able to change content after deployent by sending:
+Admin is able to change content after deployment by sending:
 
 ``` TL-B
 change_content#5ecabd5c queryId:uint64 content: ^Cell = InternalMsgBody;
@@ -262,3 +262,121 @@ forever.
 ``` TL-B
 drop_admin#67a18fb6 queryId:uint64 = InternalMsgBody;
 ```
+
+## Usage
+
+### Installation
+
+In order to install dependencies run:
+
+``` shell
+npm i
+```
+
+### Contracts
+
+Extracurrency is currently
+available in **TESTNET only**.
+
+#### EC Minter
+
+[Contract](https://testnet.tonviewer.com/kf_BPkSoNoJxvMA1kM9gncikPodLov3jSJy4UHJ4IsulrZ1d) [Source](https://github.com/ton-blockchain/governance-contract/blob/minter/minter.tolk)
+
+Interacts with config contract and mints EC
+
+For verbose interaction scheme check comments in contract sources.
+
+#### Swap contract
+
+[Contract](https://testnet.tonviewer.com/kQC_rkxBuZDwS81yvMSLzeXBNLCGFNofm0avwlMfNXCwoOgr) [Source](https://github.com/ton-blockchain/governance-contract/blob/minter/swap_with_reserve.tolk)
+
+Swaps TON to EC.
+That's the contract user should interact with.
+
+Requires 3 TON to interact with, but actual cost is just gas **IF** contract has
+enough EC on balance. Otherwise 2 TON will be sent to minter.
+
+#### Echo contract
+
+[Contract](https://testnet.tonviewer.com/kQDaKjHAKeq_yEHvYntzKk-DpckMi8s-cP4-8YsIcKXKYiBp) [Source](https://github.com/ton-blockchain/governance-contract/blob/minter/echo.tolk)
+
+Technical contract, whole purpose of which is to
+call execution of the next minter step on the next
+block.
+
+### Scripts
+
+Scripts are intended to be run with
+[blueprint](https://github.com/ton-org/blueprint)
+
+Run:
+
+``` shell
+npx blueprint run <script name>
+```
+
+Then follow through the dialog.
+
+#### Deploy EC proxy minter
+
+In order to deploy minter
+use `deployMinter` script
+
+Parameters:
+
+- Admin address via env variable `ADMIN_ADDRESS`
+- Currency id via env variable `CURRENCY_ID` (Currently only ID 100 is added to testnet)
+- Minter metadata currently specified directly in script code.
+
+Set env variables accordingly->edit metadata in script->run
+
+#### Minter operations
+
+`minterController` is the main
+script that handles minter **AND**
+proxy wallet operations, because
+minter is required to resolve proxy wallet address
+
+This script supports following operations:
+
+- Deploy wallet
+- Change metadata (for admin only)
+- Drop admin (for admin only)
+- `Info` provides info about minter state
+- `Top up` tops up minter address with TON
+
+Wallet actions:
+
+- `Send EC` Sends extracurrency from proxy wallet
+- `Withdraw excess` Withdraws excess EC and TON from proxy wallet
+
+To trigger any action above, just run the script
+and follow through the dialog.
+
+#### Request EC
+
+EC has to be requested from swap contract.
+In order to do so, use `requestTestEc` script
+and follow through the dialog.
+
+Minimum required sum to interact is 3 TON.
+
+#### Transfer EC from regular wallet
+
+At this point you should have EC on your regular wallet.
+To send EC to other destination use `sendEC` script
+
+This script uses wallet contract wrappers directly
+instead of default *ContractProvider* interface
+because *ContractProvider* does not yet support
+message construction with extracurrency value.
+
+Parameters:
+
+- Env variable `WALLET_MNEMONIC` expected to contain space separated wallet mnemonic
+- Env variable `WALLET_VERSION` expected to contain `v3r2`, `v4` or `v5`
+for wallet version
+
+Set the environment variables accordingly and run the script.
+
+If there is better way to do it, feel free to commit.
