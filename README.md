@@ -11,7 +11,7 @@ Implemented in [TOLK](https://docs.ton.org/v3/documentation/smart-contracts/tolk
 
 Wallet storage has the following layout:
 
-```
+``` TL-B
 wallet_storage$_
 inited:Bool // Indicates post-deployemnt intialization
 currency_id:uint32 // EC id
@@ -19,17 +19,19 @@ owner:MsgAddress // wallet owner address
 minter:MsgAddress // wallet minter address
 forward_gas:Coins // Amount of gas units to forward to the owner
 salt:uint13 // Salt used for shard optimizations
+= WalletStorage
 ```
 
 Further in text, data fields will be referenced in `following` styling.
 
 ### Incoming transfer
 
-Wallet accepts arbitrary non-empty(>= 32 bit length body) internal message containing EC with matching `currency_id` and value > 0.
+Wallet accepts arbitrary non-empty(>= 32 bit length body) internal message
+containing EC with matching `currency_id` and value > 0.
 In case such message doesn't contain any know op-code and carries enough gas,
 jetton transfer notification will be passed to the `owner` of the wallet.  
 
-```
+``` TL-B
 transfer_notification#7362d09c query_id:uint64 amount:(VarUInteger 16)
                               sender:MsgAddress forward_payload:(Either Cell ^Cell)
                               = InternalMsgBody;
@@ -40,17 +42,18 @@ transfer_notification#7362d09c query_id:uint64 amount:(VarUInteger 16)
 - `forward_payload` will contain incoming message full body
 
 Forward ton amount will be determined by the state parameter `forward_gas`.  
-**NOTE** that `forward_gas` is nominated in gas units, so final ton amount 
+**NOTE** that `forward_gas` is nominated in gas units, so final ton amount
 will be calculated using gas price [formula](https://docs.ton.org/v3/documentation/smart-contracts/transaction-fees/fees-low-level#gas).
 In case `fowrard_gas_amount` equals 0, no value will be attached to the notification
 which is normal in case no computation is expected on the `owner` address.
-All of the EC with matching `currency_id` is kept on the balance, while excess TON and EC(if any) is returned to sender.
+All of the EC with matching `currency_id` is kept on the balance,
+while excess TON and EC(if any) is returned to sender.
 
 #### Full format transfer
 
 It is possible to tune the receiving wallet behavior using the following message:
 
-```
+``` TL-B
 ec_transfer#68039ead forward_gas:Coins
 refund:MsgAddress
 forward_payload:(Either Cell ^Cell)
@@ -63,13 +66,14 @@ In that case:
 - If `refund` contains standard address, Excess/error refund is sent to it
 - `forward_payload` is passed as notification payload
 
-
-#### Error handling
+#### Transfer error handling
 
 In case of full format transfer message being malformed, message will bounce  
-In case of any other errors during processing, the `ton_refund` message carrying excess TON and all incoming EC will be sent to the sender or `refund` address if specified.
+In case of any other errors during processing, the `ton_refund` message
+carrying excess TON and all incoming EC will be sent to
+the sender or `refund` address if specified.
 
-```
+``` TL-B
 ton_refund#e41f7d83 query_id:uint64 error:uint10 = InternalMsgBody;
 
 ```
@@ -80,7 +84,7 @@ In case of success, EC with matching `currency_id` is kept on balance,
 and  excess TON and EC returned to sender or `refund` address
 via excess message:
 
-```
+``` TL-B
 // Compatible with jetton https://github.com/ton-blockchain/TEPs/blob/master/text/0074-jettons-standard.md#tl-b-schema
 excesses#d53276db query_id:uint64 = InternalMsgBody;
 
@@ -91,7 +95,7 @@ excesses#d53276db query_id:uint64 = InternalMsgBody;
 In order to send EC from the wallet, `owner` should send to it the transfer
 message from jetton standard:
 
-```
+``` TL-B
 // Compatible with jetton https://github.com/ton-blockchain/TEPs/blob/master/text/0074-jettons-standard.md#tl-b-schema
 transfer#0xf8a7ea5 query_id:uint64 amount:(VarUInteger 16) destination:MsgAddress
 response_destination:MsgAddress custom_payload:(Maybe ^Cell)
@@ -146,23 +150,25 @@ it's ton value - `get_forward_gas(): (gas_amount: int, ton_value: int)`.
 In order to set `forward_gas` value, owner should send  `update_forward_gas`
 message:
 
-```
+``` TL-B
 update_forward_gas#f6f24f33 query_id:uint64
 forward_gas:Coins = InternalMsgBody;
 ```
+
 Where `forward_gas` is gas units value.
 
 #### Withdraw stuck assets
 
 There are some unfortunate situations possible, where
 assets get stuck on the contract address.
-For instance sending malformed message in non_bounceable mode or
+For instance sending malformed message in *non-bounceable* mode or
 message carrying not enough value to send refund message back.  
 
-In order to resolve consequences of such situations, owner could send `withdraw_extra` message:
+In order to resolve consequences of such situations,
+owner could send `withdraw_extra` message:
 
-```
-_withdraw_id:uint32 = WithdrawSpecific;
+``` TL-B
+_ withdraw_id:uint32 = WithdrawSpecific;
 
 withdraw_extra#7ad2441e query_id:uint64
 specific:(Maybe WithdrawSpecific)
@@ -177,7 +183,7 @@ to:MsgAddress = InternalMsgBody;
 There is specific and non-specific modes of this operation.  
 In non-specific mode, contract releases all of the EC's available except
 `currency_id`,  and send all of those to the destination address.  
-In specific mode, owner could specify exact currency id to withdraw. 
+In specific mode, owner could specify exact currency id to withdraw.
 
 **KEEP IN MIND** that among with the `from_balance` value, all of the incoming
 value is send to the destination address.
@@ -186,12 +192,13 @@ value is send to the destination address.
 
 ### State layout
 
-```
-_state
+``` TL-B
+state$_
 currency_id:uint32
 owner:MessageAddress
 wallet_code:^Cell
 content:^Cell
+= MinterState
 ```
 
 - `currency_id` Index of a currency in `extra_currencies` [dictionary](https://docs.ton.org/v3/documentation/infra/minter-flow#extracurrency) which get's propagated to the newly created wallets
@@ -204,7 +211,7 @@ content:^Cell
 In order to deploy new wallet, user should send  following message to the
 *minter* contract address:
 
-```
+``` TL-B
 deploy_wallet#44bb3e46 query_id:uint64
 owner:MsgAddress
 refund:MsgAddress
@@ -241,7 +248,7 @@ while 32 iterations give result int 86% of a time at a quarter of a cost.
 
 Admin is able to change content after deployent by sending:
 
-```
+``` TL-B
 change_content#5ecabd5c queryId:uint64 content: ^Cell = InternalMsgBody;
 ```
 
@@ -252,6 +259,6 @@ where `content` should contain new content cell.
 Minter admin is able to drop it's rights, leaving minter content static
 forever.
 
-```
+``` TL-B
 drop_admin#67a18fb6 queryId:uint64 = InternalMsgBody;
 ```
