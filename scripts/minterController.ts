@@ -70,9 +70,7 @@ const sendAction    = async (provider: NetworkProvider, ui: UIProvider) => {
     tonAmount += forwardTon;
 
 
-    if(!senderAddr) {
-        senderAddr = sender.address ?? await promptAddress("Please specify sender address:", ui);
-    }
+    senderAddr = sender.address ?? await promptAddress("Please specify sender address:", ui);
 
     const refundAddress = await promptAddress("Please provide refund address:", ui, senderAddr);
 
@@ -124,9 +122,7 @@ const withdrawExtraAction = async (provider: NetworkProvider, ui: UIProvider) =>
     let withdrawOpts: WithdrawOptions;
     const sender = provider.sender();
     const withdrawSpecific = !(await promptBool("Withdraw all excess EC?", ['yes', 'no'], ui, true));
-    if(!senderAddr) {
-        senderAddr = sender.address ??  await promptAddress("Please specify proxy owner address:", ui);
-    }
+    senderAddr = sender.address ??  await promptAddress("Please specify proxy owner address:", ui);
 
     const to = await promptAddress("Please specify destination address", ui, senderAddr);
     const fromBalance = await promptToncoin("Please specify amount to withdraw from balance:", ui);
