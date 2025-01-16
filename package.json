@@ -11,7 +11,7 @@
         "@ton/core": "~0",
         "@ton/crypto": "^3.3.0",
         "@ton/sandbox": "^0.22.0-ecbeta.1",
-        "@ton/test-utils": "^0.4.2",
+        "@ton/test-utils": "^0.4.2-ecbeta.0",
         "@ton/ton": "^15.1.0",
         "@types/jest": "^29.5.14",
         "@types/node": "^22.8.7",

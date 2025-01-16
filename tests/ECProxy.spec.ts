@@ -462,21 +462,16 @@ describe('EC Proxy', () => {
                     })
                 });
             }
-            const refundTx = findTransactionRequired(res.transactions, {
+            expect(res.transactions).toHaveTransaction({
                 on: i == 0 ? receiver.address : deployer.address, // in case of full transfer funds are returned to receiver, sender otherwise.
                 from: deployerProxy.address,
                 op: Ops.wallet.excesses,
+                ec: [
+                      [ 456, amount456],
+                      [ 789, amount789]
+                ],
                 aborted: false
             })
-            const refundMsg = refundTx.inMessage!;
-            if(refundMsg.info.type !== 'internal') {
-                throw Error("Internal expected");
-            }
-            // Expect to return EC with id's other that 123
-            expect(refundMsg.info.value.other).not.toBeUndefined();
-            const refundEc = refundMsg.info.value.other!;
-            expect(refundEc.get(456)).toEqual(amount456);
-            expect(refundEc.get(789)).toEqual(amount789);
 
             const ecAfter = await getContractEc(deployerProxy.address);
             expect(ecAfter[123]).toEqual(before123 + testAmount);
@@ -896,25 +891,16 @@ describe('EC Proxy', () => {
 
         const res = await deployerProxy.sendWithdrawExtraEC(deployer.getSender(), deployer.address, {withdrawSpecific: false, fromBalance: toNano('10')});
 
-        const excessTx = findTransactionRequired(res.transactions, {
+        expect(res.transactions).toHaveTransaction({
             on: deployer.address,
             from: deployerProxy.address,
             op: Ops.wallet.excesses,
+            value: (v) => v! >= toNano('10'),
+            ec: [
+                    [456, amount456],
+                    [789, amount789],
+            ]
         });
-
-        const inMsg = excessTx.inMessage!;
-        if(inMsg.info.type !== 'internal') {
-            throw Error("No way");
-        }
-
-        const excessValue = inMsg.info.value;
-        // Will exceed due to message value
-        expect(excessValue.coins).toBeGreaterThanOrEqual(toNano('10'));
-
-        const excessEc = excessValue.other!;
-        expect(excessEc).not.toBeUndefined();
-        expect(excessEc.get(456)).toEqual(amount456);
-        expect(excessEc.get(789)).toEqual(amount789);
 
         const smc = await blockchain.getContract(deployerProxy.address);
         // Should leave min storage
@@ -941,25 +927,13 @@ describe('EC Proxy', () => {
         for(let wId of [456, 789]) {
             const res = await deployerProxy.sendWithdrawExtraEC(deployer.getSender(), deployer.address, {withdrawSpecific: true, curId: wId, fromBalance: toNano('1')});
 
-            const excessTx = findTransactionRequired(res.transactions, {
+            expect(res.transactions).toHaveTransaction({
                 on: deployer.address,
                 from: deployerProxy.address,
                 op: Ops.wallet.excesses,
+                value: (v) =>  v! >= toNano('1'),
+                ec: [[wId, amountMap[wId]]]
             });
-
-            const inMsg = excessTx.inMessage!;
-            if(inMsg.info.type !== 'internal') {
-                throw Error("No way");
-            }
-
-            const excessValue = inMsg.info.value;
-            expect(excessValue.coins).toBeGreaterThanOrEqual(toNano('1'));
-
-            const excessEc = excessValue.other!;
-            expect(excessEc).not.toBeUndefined();
-            // Expect EC dict with only key and equal expected amount
-            expect(excessEc.keys().length).toBe(1);
-            expect(excessEc.get(wId)).toEqual(amountMap[wId]);
         }
 
         await blockchain.loadFrom(beforeTest);
