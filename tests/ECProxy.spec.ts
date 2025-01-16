@@ -1,13 +1,12 @@
-import { Blockchain, BlockchainSender, BlockchainSnapshot, internal, SandboxContract, TreasuryContract } from '@ton/sandbox';
-import { Address, beginCell, Cell, Dictionary, storeMessage, toNano, internal as internal_relaxed, fromNano, address } from '@ton/core';
-import { JettonMinterContent, Minter, OnChainString, jettonContentToCell } from '../wrappers/Minter';
+import { Blockchain, BlockchainSnapshot, internal, SandboxContract, TreasuryContract, SmartContract } from '@ton/sandbox';
+import { Address, beginCell, Cell, Dictionary, storeMessage, toNano, fromNano } from '@ton/core';
+import { Minter, OnChainString, jettonContentToCell } from '../wrappers/Minter';
 import '@ton/test-utils';
 import { compile } from '@ton/blueprint';
 import { ECProxyTest } from '../wrappers/ECProxyTest';
 import { ECErrors, Ops } from '../wrappers/Constants';
-import { computedGeneric, getRandomInt, internalEc, internalEcRelaxed, parseTransferNotification, storageGeneric, testDiscovery, testJettonNotification } from './utils';
+import { computedGeneric, getRandomInt, internalEc, internalEcRelaxed, storageGeneric, testDiscovery, testJettonNotification } from './utils';
 import { findTransaction, findTransactionRequired } from '@ton/test-utils';
-import { receiveMessageOnPort } from 'node:worker_threads';
 import { getSecureRandomBytes, sha256 } from '@ton/crypto';
 import { collectCellStats, computeFwdFees, computeGasFee, getGasPrices, getMsgPrices } from './gasUtils';
 import { WithdrawOptions } from '../wrappers/ECProxy';
@@ -21,7 +20,6 @@ describe('EC Proxy', () => {
     let receiver: SandboxContract<TreasuryContract>;
     let minter: SandboxContract<Minter>;
     let deployerProxy: SandboxContract<ECProxyTest>;
-    let initialState: BlockchainSnapshot;
 
     let gasPrices: ReturnType<typeof getGasPrices>;
     let msgPrices: ReturnType<typeof getMsgPrices>;
@@ -88,27 +86,6 @@ describe('EC Proxy', () => {
                                                            deployer.address)
 
         deployerProxy = await userWallet(deployer.address);
-        /*
-        console.log("Deploy res:", deployResult.transactions[1].vmLogs);
-        const minterSmc = await blockchain.getContract(minter.address);
-        minterSmc.setVerbosity({
-            debugLogs: true,
-            vmLogs: 'vm_logs_full',
-            print: true,
-        });
-        // let getRes = await minterSmc.get('get_wallet_address', [{type: 'slice', cell: beginCell().storeAddress(deployer.address).endCell()}]);
-        // console.log("Get res:", getRes);
-
-        
-        /*
-        let smc = await blockchain.getContract(minter.address);
-        console.log("Smc balance:", smc.balance);
-
-        smc = await blockchain.getContract(deployerWallet.address);
-        console.log("ECProxy balance:", smc.balance);
-
-        console.log("Balance delta:", balanceBefore - (await deployer.getBalance()));
-        */
 
         expect(deployResult.transactions).toHaveTransaction({
             from: deployer.address,
@@ -898,7 +875,7 @@ describe('EC Proxy', () => {
         });
     });
     it('wallet owner should be able to withdraw excess tons and EC', async () => {
-        const beforeTest = await blockchain.snapshot();
+        const beforeTest = blockchain.snapshot();
         const amount456  = BigInt(getRandomInt(11, 20));
         const amount789  = BigInt(getRandomInt(21, 30));
         // Will accept empty body message
