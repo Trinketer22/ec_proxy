@@ -29,7 +29,7 @@ describe('EC Proxy', () => {
     let sendTransferGas: bigint;
 
     let userWallet: (user: Address) => Promise<SandboxContract<ECProxyTest>>;
-    let getContractEc: (contract: Address) => Promise<Dictionary<number, bigint> | null>;
+    let getContractEc: (contract: Address) => Promise<SmartContract['ec']>
     let getContractEcBalance: (contract: Address, id: number) => Promise<bigint>;
 
     let withExcessCurrency: BlockchainSnapshot;
@@ -69,16 +69,11 @@ describe('EC Proxy', () => {
             if(smc.accountState?.type !== 'active') {
                 throw Error("Contract is not active!");
             }
-            const ecDict = smc.account.account?.storage.balance.other;
-            return ecDict ?? null;
+            return smc.ec;
         };
-        getContractEcBalance = async (contract, id) => {
-            const ecDict = await getContractEc(contract);
-
-            if(ecDict) {
-                return ecDict.get(id) ?? 0n;
-            }
-            return 0n;
+        getContractEcBalance = async (address, id) => {
+            const smc = await blockchain.getContract(address);
+            return smc.ec[id] ?? 0n;
         }
 
         const deployResult = await minter.sendDeployWallet(deployer.getSender(), 
@@ -100,37 +95,40 @@ describe('EC Proxy', () => {
             op: Ops.wallet.internal_deploy,
             aborted: false
         });
-        let ecDict =  Dictionary.empty(Dictionary.Keys.Uint(32), Dictionary.Values.BigVarUint(5));
         let topUpAmount = BigInt(10 ** 8);
-        // Topping up deployer with multiple EC's to test
-        ecDict.set(123, topUpAmount);
-        ecDict.set(456, topUpAmount);
-        ecDict.set(789, topUpAmount);
+        let ecSetup: [number, bigint][] = [
+            [ 123, topUpAmount ],
+            [ 456, topUpAmount ],
+            [ 789, topUpAmount ],
+        ];
+        await blockchain.sendMessage(internal({
+            from: deployer.address,
+            to: deployer.address,
+            value: toNano('1'),
+            ec: ecSetup
+        }));
 
-        await blockchain.sendMessage({
-            info: {
-                type: 'internal',
-                bounce: false,
-                bounced: false,
-                createdAt: 0,
-                createdLt: 0n,
-                src: deployer.address,
-                dest: deployer.address,
-                forwardFee: 0n,
-                ihrDisabled: true,
-                ihrFee: 0n,
-                value: {
-                    coins: toNano('1'),
-                    other: ecDict
-                },
-            },
-            body: beginCell().endCell()
-        });
-
+        let ecAfter = await getContractEc(deployer.address);
         for(let id of [123, 456, 789]) {
-            expect(await getContractEcBalance(deployer.address, id)).toEqual(topUpAmount);
+            expect(ecAfter[id]).toEqual(topUpAmount);
         }
-        // initialState = blockchain.snapshot();
+
+        // For contract setter testing sake
+
+        const smc = await blockchain.getContract(deployer.address);
+
+        smc.ec = {
+            123: topUpAmount * 2n,
+            456: topUpAmount * 3n,
+            789: topUpAmount * 4n,
+        }
+
+        ecAfter = await getContractEc(deployer.address);
+
+        let i = 1;
+        for(let id of [123, 456, 789]) {
+            expect(ecAfter[id]).toEqual(topUpAmount * BigInt(1 + i++));
+        }
     });
 
     it('should deploy proxy', async () => {
@@ -426,9 +424,10 @@ describe('EC Proxy', () => {
         let i = 0;
         // Make sure it refunds EC in both transfer modes
         for(let testPayload of [ecTransferBody, testBody]) {
-            const before123 = await getContractEcBalance(deployerProxy.address, 123);
-            const before456 = await getContractEcBalance(deployerProxy.address, 456);
-            const before789 = await getContractEcBalance(deployerProxy.address, 789);
+            const ecBefore  = await getContractEc(deployerProxy.address);
+            const before123 = ecBefore[123]; // await getContractEcBalance(deployerProxy.address, 123);
+            const before456 = ecBefore[456]; // await getContractEcBalance(deployerProxy.address, 456);
+            const before789 = ecBefore[789]; // await getContractEcBalance(deployerProxy.address, 789);
 
             let res = await deployer.sendMessages([internalEcRelaxed({
                 to: deployerProxy.address,
@@ -479,9 +478,10 @@ describe('EC Proxy', () => {
             expect(refundEc.get(456)).toEqual(amount456);
             expect(refundEc.get(789)).toEqual(amount789);
 
-            expect(await getContractEcBalance(deployerProxy.address, 123)).toEqual(before123 + testAmount);
-            expect(await getContractEcBalance(deployerProxy.address, 456)).toEqual(before456);
-            expect(await getContractEcBalance(deployerProxy.address, 789)).toEqual(before789);
+            const ecAfter = await getContractEc(deployerProxy.address);
+            expect(ecAfter[123]).toEqual(before123 + testAmount);
+            expect(ecAfter[456]).toEqual(before456);
+            expect(ecAfter[789]).toEqual(before789);
 
             i++;
         }
@@ -721,10 +721,11 @@ describe('EC Proxy', () => {
         let txAmount = BigInt(getRandomInt(1, 1023));
         let testBody = beginCell().storeUint(0, 32).endCell(); // Smallest acceptable body - just op and empty comment
 
-        let fullMsg  = beginCell().store(storeMessage(internalEc({
+        let fullMsg  = beginCell().store(storeMessage(internal({
             to: deployerProxy.address,
             from: deployer.address,
-            value: {coins: 0n, ec: [[123, txAmount]]}, // nanoton value doesn't impact forward fee
+            value: 0n,
+            ec: [[123, txAmount]],
             body: testBody
         }))).endCell();
 
@@ -888,8 +889,8 @@ describe('EC Proxy', () => {
             ]},
         })]);
         const proxyEc = (await getContractEc(deployerProxy.address))!;
-        expect(proxyEc.get(456)).toEqual(amount456);
-        expect(proxyEc.get(789)).toEqual(amount789);
+        expect(proxyEc[456]).toEqual(amount456);
+        expect(proxyEc[789]).toEqual(amount789);
 
         withExcessCurrency = blockchain.snapshot();
 
@@ -926,8 +927,9 @@ describe('EC Proxy', () => {
 
         await blockchain.loadFrom(withExcessCurrency);
 
-        const amount456 = await getContractEcBalance(deployerProxy.address, 456);
-        const amount789 = await getContractEcBalance(deployerProxy.address, 789);
+        const ecBefore  = await getContractEc(deployerProxy.address);
+        const amount456 = ecBefore[456];
+        const amount789 = ecBefore[789];
 
         expect(amount456).toBeGreaterThan(0n);
         expect(amount789).toBeGreaterThan(0n);
@@ -977,13 +979,13 @@ describe('EC Proxy', () => {
         let res = await deployerProxy.sendWithdrawExtraEC(deployer.getSender(), deployer.address, {withdrawSpecific: false, fromBalance: 0n});
 
         // All excess EC should be withdrawn
-        let proxyEc = (await getContractEc(deployerProxy.address))!;
+        let proxyEc = await getContractEc(deployerProxy.address);
         expect(proxyEc).not.toBeUndefined();
-        expect(proxyEc.get(456)).toBeUndefined();
-        expect(proxyEc.get(789)).toBeUndefined();
+        expect(proxyEc[456]).toBeUndefined();
+        expect(proxyEc[789]).toBeUndefined();
 
         // But main one should stay
-        const balanceBefore = proxyEc.get(123);
+        const balanceBefore = proxyEc[123];
         expect(balanceBefore).toBeGreaterThan(0n);
 
         const toWithdraw = toNano('10');
@@ -1026,8 +1028,9 @@ describe('EC Proxy', () => {
 
         await blockchain.loadFrom(withExcessCurrency);
 
-        const amount456 = await getContractEcBalance(deployerProxy.address, 456);
-        const amount789 = await getContractEcBalance(deployerProxy.address, 789);
+        const ecBalance = await getContractEc(deployerProxy.address);
+        const amount456 = ecBalance[456];
+        const amount789 = ecBalance[789];
 
         expect(amount456).toBeGreaterThan(0n);
         expect(amount789).toBeGreaterThan(0n);
