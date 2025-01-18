@@ -367,6 +367,49 @@ describe('EC Proxy', () => {
 
         expect(balanceBefore).toEqual(smc.balance);
     });
+    it('should accept EC from empty message and notify owner', async () => {
+        const testAmount = BigInt(getRandomInt(1, 10 ** 6));
+
+        const smc = await blockchain.getContract(deployerProxy.address);
+        const balanceBefore = smc.balance;
+        const ecBefore = smc.ec[123] ?? 0n;
+
+        let res = await deployer.sendMessages([internalEcRelaxed({
+            to: deployerProxy.address,
+            value: {coins: toNano('1'), ec: [[123, testAmount]]},
+            // No body this time
+        })]);
+
+        expect(await getContractEcBalance(deployerProxy.address, 123)).toEqual(ecBefore + testAmount);
+        const simpleTransfer = findTransactionRequired(res.transactions, {
+            on: deployerProxy.address,
+            from: deployer.address,
+            aborted: false,
+            outMessagesCount: 2
+        });
+
+        simpleTransferGas = computedGeneric(simpleTransfer).gasUsed;
+        console.log("Simple transfer empty body gas:", simpleTransferGas);
+
+        expect(res.transactions).toHaveTransaction({
+            on: deployer.address,
+            from: deployerProxy.address,
+            op: Ops.wallet.transfer_notification,
+            body: (x) => testJettonNotification(x!, {
+                from: deployer.address,
+                amount: testAmount,
+            }),
+            value: 0n,
+        });
+        expect(res.transactions).toHaveTransaction({
+            on: deployer.address,
+            from: deployerProxy.address,
+            op: Ops.wallet.excesses,
+            value: (v) => v! > 0n
+        });
+
+        expect(balanceBefore).toEqual(smc.balance);
+    });
     it('should accept EC from fully formated message and notify owner', async () => {
         const testBody = beginCell().storeStringTail("Official greetings!").endCell();
         const testAmount = BigInt(getRandomInt(1, 10 ** 6));
@@ -645,7 +688,7 @@ describe('EC Proxy', () => {
         // Picked in such a way grams storage bits are static and fwd fee doesn't change
         let txAmount    = BigInt(getRandomInt(512, 1023));
         let fwdAmount   = BigInt(getRandomInt(1, 5)) * toNano('0.1');
-        let minAmount   = toNano('0.0109316');
+        let minAmount   = toNano('0.0109396');
         let testPayload = beginCell().storeUint(getRandomInt(1000, 10000), 32).endCell();
 
         let res = await deployerProxy.sendTransfer(deployer.getSender(),
@@ -874,14 +917,17 @@ describe('EC Proxy', () => {
         const beforeTest = blockchain.snapshot();
         const amount456  = BigInt(getRandomInt(11, 20));
         const amount789  = BigInt(getRandomInt(21, 30));
-        // Will accept empty body message
+
         await deployer.sendMessages([internalEcRelaxed({
+            bounce: false,
             to: deployerProxy.address,
             value: {coins: toNano('10'), ec: [
                 // Non-legitimate
                 [456, amount456],
                 [789, amount789],
             ]},
+            // Point is that message should bounce, but will not due to bounce -> false
+            body: beginCell().storeUint(Ops.wallet.ec_transfer, 32).endCell()
         })]);
         const proxyEc = (await getContractEc(deployerProxy.address))!;
         expect(proxyEc[456]).toEqual(amount456);

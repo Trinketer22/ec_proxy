@@ -18,7 +18,7 @@ fun onInternalMessage(myTonBalance: int, msgValue: int, msgFull: cell, msgBody: 
 	var cs    = msgFull.beginParse();
 	var flags  = cs.loadMessageFlags();
 	
-	if(isMessageBounced(flags) || msgBody.isEndOfSlice()) {
+	if(isMessageBounced(flags)) {
 		return;
 	}
 
@@ -26,7 +26,7 @@ fun onInternalMessage(myTonBalance: int, msgValue: int, msgFull: cell, msgBody: 
 	var refund: slice = sender;
 	var forwardPayload = msgBody;
 
-	var op = msgBody.loadUint(32);
+	var op = msgBody.isEndOfSlice() ? 0 : msgBody.loadUint(32);
 	var queryId = 0;
 	var packed  = 0;
 	var (inited, curId, owner, minter, forwardGas, salt) = loadData();
