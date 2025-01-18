@@ -1,5 +1,5 @@
-const deploy_wallet   = 0x44bb3e46;
-const internal_deploy = 0x6a4de08d;
+const deploy_wallet   = 0xad9d230a;
+const internal_deploy = 0xa97ca079;
 const provide_wallet_address = 0x2c76b973;
 const take_wallet_address = 0xd1735400;
 const excesses = 0xd53276db;

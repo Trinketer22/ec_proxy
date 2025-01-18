@@ -29,11 +29,13 @@ _ grams:Grams = Coins;
 
 // Requests
 
-deploy_wallet#44bb3e46 query_id:uint64
+deploy_wallet#ad9d230a
+query_id:uint64
 owner:MsgAddress
 refund:MsgAddress
+acceptEmptyBody:Bool
 forwardGas:Coins = InternalMsgBody;
-// crc32('deploy_wallet query_id:uint64 owner:MsgAddress refund:MsgAddress forwardGas:Coins = InternalMsgBody') = 0x44bb3e46 & 0x7FFFFFFF = 0x44bb3e46
+// crc32('deploy_wallet query_id:uint64 owner:MsgAddress refund:MsgAddress acceptEmptyBody:Bool forwardGas:Coins = InternalMsgBody') = 0x44bb3e46 & 0x7FFFFFFF = 0x44bb3e46
 
 change_content#5ecabd5c queryId:uint64 content: ^Cell = InternalMsgBody;
 // crc32('change_content queryId:uint64 content: ^Cell = InternalMsgBody') = 0x5ecabd5c & 0x7FFFFFFF = 0x5ecabd5c
