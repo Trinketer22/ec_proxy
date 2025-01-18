@@ -9,7 +9,7 @@ import { computedGeneric, getRandomInt, internalEc, internalEcRelaxed, storageGe
 import { findTransaction, findTransactionRequired } from '@ton/test-utils';
 import { getSecureRandomBytes, sha256 } from '@ton/crypto';
 import { collectCellStats, computeFwdFees, computeGasFee, getGasPrices, getMsgPrices } from './gasUtils';
-import { WithdrawOptions } from '../wrappers/ECProxy';
+import { ProxyOptions, WithdrawOptions } from '../wrappers/ECProxy';
 
 describe('EC Proxy', () => {
     let minterCode: Cell;
@@ -367,7 +367,7 @@ describe('EC Proxy', () => {
 
         expect(balanceBefore).toEqual(smc.balance);
     });
-    it('should accept EC from empty message and notify owner', async () => {
+    it('should accept EC with empty message and notify owner', async () => {
         const testAmount = BigInt(getRandomInt(1, 10 ** 6));
 
         const smc = await blockchain.getContract(deployerProxy.address);
@@ -688,7 +688,7 @@ describe('EC Proxy', () => {
         // Picked in such a way grams storage bits are static and fwd fee doesn't change
         let txAmount    = BigInt(getRandomInt(512, 1023));
         let fwdAmount   = BigInt(getRandomInt(1, 5)) * toNano('0.1');
-        let minAmount   = toNano('0.0109396');
+        let minAmount   = toNano('0.011034');
         let testPayload = beginCell().storeUint(getRandomInt(1000, 10000), 32).endCell();
 
         let res = await deployerProxy.sendTransfer(deployer.getSender(),
@@ -816,43 +816,109 @@ describe('EC Proxy', () => {
             }
         });
     });
-    it('not owner should not be able to update forward gas amount', async () => {
+    it('not owner should not be able to update proxy options', async () => {
         const newForwardGas = BigInt(getRandomInt(1000, 10000));
-        let res = await deployerProxy.sendUpdateForwardGas(receiver.getSender(), newForwardGas);
+        let optionCases: Partial<ProxyOptions>[] = [
+            {forwardGas: newForwardGas},
+            {acceptEmptyBody: false},
+            {acceptEmptyBody: true},
+            {forwardGas: newForwardGas, acceptEmptyBody: true},
+            {forwardGas: newForwardGas, acceptEmptyBody: false}
+        ];
 
-        expect(res.transactions).toHaveTransaction({
-            on: deployerProxy.address,
-            from: receiver.address,
-            op: Ops.wallet.update_forward_gas,
-            aborted: true,
-            success: false
-        });
+        for(let opts of optionCases) {
+            let res = await deployerProxy.sendUpdateProxyOptions(receiver.getSender(), opts);
+
+            expect(res.transactions).toHaveTransaction({
+                on: deployerProxy.address,
+                from: receiver.address,
+                op: Ops.wallet.update_proxy_options,
+                aborted: true,
+                success: false
+            });
+        }
     });
-    it('owner should be able to update forward gas amount', async () => {
+    it('owner should be able to update proxy options', async () => {
         let dataBefore = await deployerProxy.getWalletDataExtended();
         const newForwardGas = BigInt(getRandomInt(1000, 10000));
-        let res = await deployerProxy.sendUpdateForwardGas(deployer.getSender(), newForwardGas);
+        let optionCases: Partial<ProxyOptions>[] = [
+            {forwardGas: newForwardGas},
+            {acceptEmptyBody: false},
+            {acceptEmptyBody: true},
+            {forwardGas: newForwardGas, acceptEmptyBody: true},
+            {forwardGas: newForwardGas, acceptEmptyBody: false}
+        ];
 
+        for(let opts of optionCases) {
+            let res = await deployerProxy.sendUpdateProxyOptions(deployer.getSender(), opts);
+
+            expect(res.transactions).toHaveTransaction({
+                on: deployerProxy.address,
+                from: deployer.address,
+                op: Ops.wallet.update_proxy_options,
+                aborted: false
+            });
+
+            if(opts.forwardGas !== undefined) {
+                const gasAfter = await deployerProxy.getForwardGas();
+                expect(gasAfter.forwardGas).toEqual(newForwardGas);
+                expect(gasAfter.forwardGasFee).toEqual(computeGasFee(gasPrices, newForwardGas));
+            }
+
+            const dataAfter = await deployerProxy.getWalletDataExtended();
+
+            if(opts.acceptEmptyBody !== undefined) {
+                expect(dataAfter.acceptEmpty).toEqual(opts.acceptEmptyBody);
+            }
+
+            expect(dataAfter.balance).toEqual(dataBefore.balance);
+            expect(dataAfter.inited).toEqual(dataBefore.inited);
+            expect(dataAfter.currencyId).toEqual(dataBefore.currencyId);
+            expect(dataAfter.minter).toEqualAddress(dataBefore.minter);
+            expect(dataAfter.owner).toEqualAddress(dataBefore.owner);
+            expect(dataAfter.salt).toEqual(dataBefore.salt);
+            expect(dataAfter.wallet_code).toEqualCell(dataBefore.wallet_code);
+        }
+    });
+    it('should not accept empty message when accept_empty set to false', async () => {
+        const stateBefore = blockchain.snapshot();
+
+        await deployerProxy.sendUpdateProxyOptions(deployer.getSender(), {acceptEmptyBody: false});
+        const dataAfter = await deployerProxy.getWalletDataExtended();
+        expect(dataAfter.acceptEmpty).toBe(false);
+
+        const testAmount = BigInt(getRandomInt(1, 10 ** 6));
+
+        const smc = await blockchain.getContract(deployerProxy.address);
+        const ecBefore = smc.ec[123] ?? 0n;
+
+        let res = await deployer.sendMessages([internalEcRelaxed({
+            bounce: false, // To demonstrate that value return doesn't depend on bounce
+            to: deployerProxy.address,
+            value: {coins: toNano('1'), ec: [[123, testAmount]]},
+            // No body this time
+        })]);
+
+        expect(res.transactions).not.toHaveTransaction({
+            on: deployer.address,
+            from: deployerProxy.address,
+            op: Ops.wallet.transfer_notification
+        });
+        // Expect to return back
         expect(res.transactions).toHaveTransaction({
-            on: deployerProxy.address,
-            from: deployer.address,
-            op: Ops.wallet.update_forward_gas,
-            aborted: false
+            on: deployer.address,
+            from: deployerProxy.address,
+            op: Ops.wallet.ton_refund,
+            body: (b) => {
+                const ds = b!.beginParse().skip(32 + 64);
+                return ds.loadUint(10) == ECErrors.invalid_message;
+            }
+
         });
 
-        const gasAfter = await deployerProxy.getForwardGas();
-        expect(gasAfter.forwardGas).toEqual(newForwardGas);
-        expect(gasAfter.forwardGasFee).toEqual(computeGasFee(gasPrices, newForwardGas));
+        expect(await getContractEcBalance(deployerProxy.address, 123)).toEqual(ecBefore);
 
-        const dataAfter = await deployerProxy.getWalletDataExtended();
-
-        expect(dataAfter.balance).toEqual(dataBefore.balance);
-        expect(dataAfter.inited).toEqual(dataBefore.inited);
-        expect(dataAfter.currencyId).toEqual(dataBefore.currencyId);
-        expect(dataAfter.minter).toEqualAddress(dataBefore.minter);
-        expect(dataAfter.owner).toEqualAddress(dataBefore.owner);
-        expect(dataAfter.salt).toEqual(dataBefore.salt);
-        expect(dataAfter.wallet_code).toEqualCell(dataBefore.wallet_code);
+        await blockchain.loadFrom(stateBefore);
     });
     it('simple transfer now should require additional gas', async () => {
         const gasReq = await deployerProxy.getForwardGas();
