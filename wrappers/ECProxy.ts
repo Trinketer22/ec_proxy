@@ -9,6 +9,12 @@ type OptionsWithdrawSpecific = {
 type OptionsWithdrawAll = {
     withdrawSpecific: false
 }
+
+export type ProxyOptions = {
+    forwardGas: bigint,
+    acceptEmptyBody: boolean
+}
+
 export type WithdrawOptions = {
     queryId?: bigint,
     value?: bigint
@@ -84,20 +90,33 @@ export class ECProxy implements Contract {
         });
     }
 
-    static updateForwardGasMessage(forwardGas: bigint, queryId: bigint | number = 0) {
-        return beginCell().storeUint(Ops.wallet.update_forward_gas, 32)
-                          .storeUint(queryId, 64)
-                          .storeCoins(forwardGas)
-               .endCell();
+    static updateProxyOptionsMessage(options: Partial<ProxyOptions>, queryId: bigint | number = 0) {
+        if(options.forwardGas === undefined && options.acceptEmptyBody === undefined) {
+            throw TypeError("No options specified for update");
+        }
 
+        const ds = beginCell().storeUint(Ops.wallet.update_proxy_options, 32).storeUint(queryId, 64);
+
+        if(options.forwardGas !== undefined) {
+            ds.storeBit(true).storeCoins(options.forwardGas);
+        } else {
+            ds.storeBit(false);
+        }
+        if(options.acceptEmptyBody !== undefined) {
+            ds.storeBit(true).storeBit(options.acceptEmptyBody)
+        } else {
+            ds.storeBit(false);
+        }
+        return ds.endCell();
     }
 
-    async sendUpdateForwardGas(provider: ContractProvider, via: Sender,
-                                  forwardGas: bigint, value: bigint = toNano('0.05'),
+    async sendUpdateProxyOptions(provider: ContractProvider, via: Sender,
+                                  options: Partial<ProxyOptions>,
+                                  value: bigint = toNano('0.05'),
                                   queryId: bigint | number = 0) {
         await provider.internal(via, {
             value,
-            body: ECProxy.updateForwardGasMessage(forwardGas, queryId),
+            body: ECProxy.updateProxyOptionsMessage(options, queryId),
             sendMode: SendMode.PAY_GAS_SEPARATELY
         });
     }
@@ -123,6 +142,7 @@ export class ECProxy implements Contract {
             currencyId: stack.readNumber(),
             owner: stack.readAddress(),
             minter: stack.readAddress(),
+            acceptEmpty: stack.readBoolean(),
             forwardGas: stack.readBigNumber(),
             salt: stack.readBigNumber(),
             wallet_code: stack.readCell()

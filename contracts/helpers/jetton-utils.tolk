@@ -2,7 +2,7 @@ import "@stdlib/tvm-dicts"
 import "errors.tolk";
 import "workchain.tolk"
 
-const SALT_SIZE = 13; // if changed, update calculate_jetton_wallet_data_hash_cheap and pack_jetton_wallet_data_hash_base (data bits size and padding)
+const SALT_SIZE = 12; // if changed, update calculate_jetton_wallet_data_hash_cheap and pack_jetton_wallet_data_hash_base (data bits size and padding)
 const ITERATION_NUM = 128; // should be less than 2^SALT_SIZE-1
 
 
@@ -71,6 +71,7 @@ fun packJettonWalletDataBuilderBase(curId: int, ownerAddress: slice, jettonMaste
         .storeUint(curId, 32)
         .storeSlice(ownerAddress)
         .storeSlice(jettonMasterAddress)
+        .storeUint(0, 1)
         .storeCoins(0);
 }
 
@@ -83,7 +84,7 @@ fun packJettonWalletDataHashBase(walletDataBase: builder): builder {
             // we have 0 refs , non-exotic, zero mask
             //0 |
             // bits_descriptor: floor(bit_count/8) + ceil(bit_count/8)
-            // we have 1 + 32 + 267 + 267 + 4 + 13 = 584 bit of data, bits_descriptor = 73 + 73 = 146
+            // we have 1 + 32 + 267 + 267 + 1 + 4 + 12 = 584 bit of data, bits_descriptor = 73 + 73 = 146
             146,
             16
         )

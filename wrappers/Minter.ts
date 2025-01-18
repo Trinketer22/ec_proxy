@@ -93,19 +93,20 @@ export class Minter implements Contract {
         });
     }
 
-    static deployWalletMessage(owner: Address, excess: Address, forwardGas: bigint = 0n, queryId: bigint = 0n) {
+    static deployWalletMessage(owner: Address, excess: Address, acceptEmpty: boolean = true, forwardGas: bigint = 0n, queryId: bigint = 0n) {
         return beginCell().storeUint(Ops.minter.deploy_wallet, 32)
                    .storeUint(queryId, 64)
                    .storeAddress(owner)
                    .storeAddress(excess)
+                   .storeBit(acceptEmpty)
                    .storeCoins(forwardGas)
                .endCell();
     }
-    async sendDeployWallet(provider: ContractProvider, via: Sender, owner: Address, excess: Address, forwardGas: bigint = 0n, value: bigint = toNano('0.15'), queryId: bigint = 0n) {
+    async sendDeployWallet(provider: ContractProvider, via: Sender, owner: Address, excess: Address, acceptEmpty: boolean = true,forwardGas: bigint = 0n, value: bigint = toNano('0.15'), queryId: bigint = 0n) {
         await provider.internal(via, {
             value,
             sendMode: SendMode.PAY_GAS_SEPARATELY,
-            body: Minter.deployWalletMessage(owner, excess, forwardGas, queryId)
+            body: Minter.deployWalletMessage(owner, excess, acceptEmpty, forwardGas, queryId)
         });
     }
 

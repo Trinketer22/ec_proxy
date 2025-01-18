@@ -38,12 +38,14 @@ fun onInternalMessage(myBalance: int, msgValue: int, msgFull: cell, msgBody: sli
     query_id:uint64
     owner_address:MsgAddress
     excesses_address:MsgAddress
+    accept_empty: Bool
     forward_amount: Coins
     = InternalMsgBody;
     */
 
     var owner    = msgBody.loadAddress();
     var excessTo = msgBody.loadAddress();
+    var acceptEmpty  = msgBody.loadUint(1);
     var forwardAmount = msgBody.loadCoins();
 
     var newWalletState = calculateJettonWalletStateInit(
@@ -59,14 +61,15 @@ fun onInternalMessage(myBalance: int, msgValue: int, msgFull: cell, msgBody: sli
                     .storeUint(internal_deploy, 32)
                     .storeUint(queryId, 64)
                     .storeSlice(excessTo)
+                    .storeUint(acceptEmpty, 1)
                     .storeCoins(forwardAmount)
-    .endCell();
+                  .endCell();
 
     var msg = beginCell()
     .storeMsgFlagsAndAddressNone(BOUNCEABLE)
     .storeSlice(newWalletAddress) // dest
     .storeCoins(0)
-		.storeStateinitRefAndBodyRef(newWalletState, msgBody);
+    .storeStateinitRefAndBodyRef(newWalletState, msgBody);
 
     sendRawMessage(msg.endCell(), SEND_MODE_CARRY_ALL_BALANCE | SEND_MODE_BOUNCE_ON_ACTION_FAIL);
     return;

@@ -58,6 +58,7 @@ fun onInternalMessage(myTonBalance: int, msgValue: int, msgFull: cell, msgBody: 
 		if(isStandard == 0) {
 			excessAddr = owner;
 		}
+                acceptEmpty = msgBody.loadUint(1);
 		forwardGas = msgBody.loadCoins();
 		msgBody.assertEndOfSlice();
 		sendExcess(tonReserve, RESERVE_MODE, createEmptyDict(), excesses, queryId, 0, excessAddr);
@@ -154,12 +155,13 @@ fun onInternalMessage(myTonBalance: int, msgValue: int, msgFull: cell, msgBody: 
 		sendExcess(fromBalance, RESERVE_MODE | RESERVE_EXCEPT, reserveEc, excesses, queryId, 0, to);
 		return;
 	}
-	if(op == update_forward_gas) {
+	if(op == update_proxy_options) {
 		assert(isSliceBitsEqual(sender, owner), invalid_sender);
-		var newForwardGas = msgBody.loadCoins();
+		var newForwardGas  = msgBody.loadUint(1) ? msgBody.loadCoins() : forwardGas;
+                var newAcceptEmpty = msgBody.loadUint(1) ? msgBody.loadUint(1) : acceptEmpty;
 		msgBody.assertEndOfSlice();
 
-		updateForwardAmount(newForwardGas);
+		updateProxyOptions(newForwardGas, newAcceptEmpty);
 		sendExcess(0, RESERVE_MODE, createEmptyDict(), excesses, queryId, 0, sender);
 		return;
 	}
@@ -190,6 +192,9 @@ fun onInternalMessage(myTonBalance: int, msgValue: int, msgFull: cell, msgBody: 
                         gasFee = RECEIVE_TRANSFER_PACKED;
 		} else {
                         gasFee = RECEIVE_TRANSFER_RAW;
+                        if(forwardPayload.isEndOfSlice()) {
+                            assert(acceptEmpty, invalid_message);
+                        }
 			forwardPayload = beginCell().storeEitherPayload(forwardPayload).endCell().beginParse();
                         // Otherwise, full message is wrapped into notification, so excess reserve is in order,
                         extraFwdFee = mulDivFloor(extraFwdFee, 3, 2);
@@ -215,7 +220,7 @@ get get_wallet_data() {
 get get_wallet_data_extended() {
 	var (inited, curId, owner, minter, forwardGas, salt) = loadData();
 	var (balance: int, res) = getEcBalance(getRawEc(), curId);
-	return (balance, inited, curId, owner, minter, forwardGas, salt, getContractCode());
+	return (balance, inited, curId, owner, minter, acceptEmpty, forwardGas, salt, getContractCode());
 }
 
 get get_forward_gas() {
