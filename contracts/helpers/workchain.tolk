@@ -4,7 +4,7 @@ const MY_WORKCHAIN = 0;
 
 @pure
 fun isStandardAddress(s: slice): (int, int, int)
-    asm "REWRITESTDADDRQ";
+    asm "REWRITESTDADDRQ NULLSWAPIFNOT2";
 
 @inline
 fun isSameWorkchain(addr: slice): int {
